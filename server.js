@@ -1,17 +1,11 @@
 const express = require("express");
 const {
-  Language,
-  Parser,
+  Parser: { CombinatorialParserV2, ParseError },
   DefaultSettings,
-  Task
+  Language: { Token }
 } = require("@microsoft/powerquery-parser");
 
-// Diagnostic logging
-console.log('Language structure:', Object.keys(Language));
-console.log('Parser structure:', Object.keys(Parser));
-
 const app = express();
-
 app.use(express.json());
 
 app.post("/parse", (req, res) => {
@@ -22,24 +16,27 @@ app.post("/parse", (req, res) => {
   }
 
   try {
-    if (Language.CombinatorialParser) {
-      console.log('Found CombinatorialParser');
-    }
-    if (Language.Parser) {
-      console.log('Found Language.Parser');
-    }
-    if (Parser.Expression) {
-      console.log('Found Parser.Expression');
-    }
+    // Create parser instance
+    const parser = new CombinatorialParserV2(DefaultSettings);
     
-    // Return the available functions for debugging
-    return res.json({
+    // Initialize parse context
+    const context = parser.createContext(expression);
+    
+    // Attempt to parse
+    const parseResult = parser.parse(context);
+    
+    // Check if parsing was successful
+    if (parseResult instanceof ParseError) {
+      return res.status(400).json({ 
+        success: false,
+        error: "Parse error",
+        details: parseResult
+      });
+    }
+
+    return res.json({ 
       success: true,
-      debug: {
-        languageKeys: Object.keys(Language),
-        parserKeys: Object.keys(Parser),
-        hasDefaultSettings: !!DefaultSettings
-      }
+      result: parseResult
     });
     
   } catch (error) {
