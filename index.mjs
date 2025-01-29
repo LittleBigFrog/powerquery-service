@@ -1,6 +1,7 @@
-// Correct import paths for @microsoft/powerquery-parser v0.15.10
-const { parse } = require('@microsoft/powerquery-parser');
-const { DefaultSettings } = require('@microsoft/powerquery-parser');
+// index.mjs (or index.js if "type": "module" is set in package.json)
+
+// Import the named exports via ESM syntax
+import { parse, DefaultSettings } from '@microsoft/powerquery-parser';
 
 /**
  * Parses a Power Query expression and returns the AST (Abstract Syntax Tree).
@@ -9,7 +10,7 @@ const { DefaultSettings } = require('@microsoft/powerquery-parser');
  */
 function parsePowerQuery(expression) {
     try {
-        // Use the parse function with DefaultSettings
+        // Use the parse function with DefaultSettings as the first argument
         const ast = parse(DefaultSettings, expression);
         return ast;
     } catch (error) {
