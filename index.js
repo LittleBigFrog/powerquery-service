@@ -1,5 +1,5 @@
 // Correct import for @microsoft/powerquery-parser v0.15.10
-const { Parser, DefaultSettings } = require('@microsoft/powerquery-parser');
+const { parse, DefaultSettings } = require('@microsoft/powerquery-parser');
 
 /**
  * Parses a Power Query expression and returns the AST (Abstract Syntax Tree).
@@ -8,8 +8,8 @@ const { Parser, DefaultSettings } = require('@microsoft/powerquery-parser');
  */
 function parsePowerQuery(expression) {
     try {
-        // Use the parse function from the Parser module
-        const ast = Parser.parse(expression, DefaultSettings);
+        // Use the parse function directly
+        const ast = parse(expression, DefaultSettings);
         return ast;
     } catch (error) {
         throw new Error(`Failed to parse Power Query: ${error.message}`);
