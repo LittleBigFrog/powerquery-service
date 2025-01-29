@@ -1,14 +1,16 @@
 const express = require("express");
-const powerquery = require("@microsoft/powerquery-parser");
-
-// Add diagnostic logging
-console.log('Available modules:', Object.keys(powerquery));
+const {
+  Language,
+  Parser,
+  DefaultSettings,
+  Task
+} = require("@microsoft/powerquery-parser");
 
 const app = express();
 
 app.use(express.json());
 
-app.post("/parse", async (req, res) => {
+app.post("/parse", (req, res) => {
   const { expression } = req.body;
   
   if (!expression) {
@@ -16,8 +18,13 @@ app.post("/parse", async (req, res) => {
   }
 
   try {
-    // Parse the text directly using Text.parse
-    const parseResult = await Text.parse(expression);
+    // Create the parser context
+    const lexerState = Language.createStateful(DefaultSettings, expression);
+    
+    // Parse the expression
+    const parseResult = Parser.Expression.tryParse(lexerState, expression);
+    
+    console.log('Parse result:', parseResult); // Debug logging
     
     return res.json({ 
       success: true,
@@ -37,4 +44,10 @@ app.post("/parse", async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Power Query Parser Service running on port ${PORT}`);
+  console.log('Using modules:', {
+    hasLanguage: !!Language,
+    hasParser: !!Parser,
+    hasDefaultSettings: !!DefaultSettings,
+    hasTask: !!Task
+  });
 });
