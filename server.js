@@ -1,59 +1,69 @@
+/*****************************************************************************
+ * server.js
+ *****************************************************************************/
 const express = require("express");
-// Pull out Language & DefaultSettings from top-level
-const { Language, DefaultSettings } = require("@microsoft/powerquery-parser");
+const pqp = require("@microsoft/powerquery-parser");
 
-// If you want deeper parser internals (like NodeIdMap, etc.),
-// you can also import from sub-paths like:
-// const { NodeIdMap } = require("@microsoft/powerquery-parser/lib/powerquery-parser/parser");
+// 1) Immediately log what we have
+console.log("=== PowerQuery top-level exports ===");
+console.log(Object.keys(pqp));
+
+if (pqp.Language) {
+  console.log("=== PowerQuery.Language keys ===");
+  console.log(Object.keys(pqp.Language));
+
+  if (pqp.Language.Parse) {
+    console.log("=== PowerQuery.Language.Parse keys ===");
+    console.log(Object.keys(pqp.Language.Parse));
+  } else {
+    console.log("No 'Parse' object under 'pqp.Language'");
+  }
+} else {
+  console.log("No 'Language' object under 'pqp'!");
+}
+
+// We'll use DefaultSettings if it exists at top level
+const { DefaultSettings } = pqp;
 
 const app = express();
 app.use(express.json());
 
-// Optional GET route to quickly test in browser
+// Simple GET route for quick browser check
 app.get("/", (req, res) => {
-  res.send("PowerQuery Parser Service (v0.15.x) is running!");
+  res.send("PowerQuery Parser Service (Debug Build) is running!");
 });
 
-// POST /parse to parse an expression and return AST details
+// 2) POST /parse route
 app.post("/parse", (req, res) => {
   const { expression } = req.body;
-
   if (!expression) {
-    return res.status(400).json({ 
-      success: false,
-      error: "No expression provided." 
-    });
+    return res.status(400).json({ error: "No expression provided." });
   }
 
-  // Attempt to parse using 0.15.x approach
-  const parseResult = Language.Parse.parse(DefaultSettings, expression);
+  try {
+    // Check if parse function exists
+    const parseFn = pqp.Language?.Parse?.parse;
+    if (!parseFn) {
+      return res.status(501).json({
+        error:
+          "parse function not found at pqp.Language.Parse.parse. Check logs for actual structure.",
+      });
+    }
 
-  // parseResult.kind can be "ParseOk" or "ParseError"
-  if (parseResult.kind === "ParseError") {
-    // On parse error
-    return res.status(400).json({
-      success: false,
-      error: "ParseError",
-      details: parseResult.error
-        ? parseResult.error.message
-        : "Unknown parse error"
-    });
+    // Call parse
+    const parseResult = parseFn(DefaultSettings, expression);
+
+    // parseResult might be ParseError or ParseOk. We'll just return it directly
+    return res.json({ parseResult });
+  } catch (err) {
+    // If anything blows up internally
+    console.error("Parsing error:", err);
+    return res.status(500).json({ error: err.message, stack: err.stack });
   }
-
-  // On successful parse => parseResult.kind === "ParseOk"
-  // The AST is in parseResult.state.contextState.nodeIdMapCollection
-  const parseOk = parseResult; // for clarity
-  const ast = parseOk.state.contextState.nodeIdMapCollection;
-
-  // Return the "AST" (which includes node IDs, a scope map, etc.)
-  return res.json({
-    success: true,
-    // "ast" might be quite large. Return as is or transform as needed
-    ast
-  });
 });
 
+// Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Power Query Parser Service running on port ${PORT}`);
+  console.log(`PowerQuery Parser debugging server listening on port ${PORT}`);
 });
