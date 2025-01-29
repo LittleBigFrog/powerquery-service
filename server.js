@@ -1,55 +1,78 @@
 /*****************************************************************************
- * server.js - Diagnostic sub-path approach
+ * server.js - NaiveParseSteps approach for powerquery-parser@0.15.x
  *****************************************************************************/
 const express = require("express");
 
-// Try importing from the 'lib/powerquery-parser/parser' path:
-const parserExports = require("@microsoft/powerquery-parser/lib/powerquery-parser/parser");
+// Import from the "parser" sub-path
+const {
+  ParserUtils,
+  ParseContext,
+  NaiveParseSteps,
+  ParseError,
+} = require("@microsoft/powerquery-parser/lib/powerquery-parser/parser");
 
-// Also import DefaultSettings from 'lib/powerquery-parser/settings'
-const { DefaultSettings } = require("@microsoft/powerquery-parser/lib/powerquery-parser/settings");
+// Also import DefaultSettings from "settings"
+const {
+  DefaultSettings,
+} = require("@microsoft/powerquery-parser/lib/powerquery-parser/settings");
 
 const app = express();
 app.use(express.json());
 
-// 1) Log what we actually have in "parserExports"
-console.log("=== pqp parserExports keys ===", Object.keys(parserExports));
-
+// Optional GET route for a quick health check
 app.get("/", (req, res) => {
-  res.send("Hello from the diagnostic Power Query parser server!");
+  res.send("Hello from the Power Query Parser (NaiveParseSteps)!");
 });
 
-// 2) POST /parse route
+// POST /parse => parse a Power Query expression
 app.post("/parse", (req, res) => {
   const { expression } = req.body;
   if (!expression) {
     return res.status(400).json({ error: "No expression provided" });
   }
+
   try {
-    // Check if there's a 'parse' function
-    if (!parserExports.parse) {
-      // Possibly it's exported under some other name
-      // We'll show the actual keys so you can see what is there
-      return res.status(501).json({
-        error: "No 'parse' function found in parser sub-path.",
-        keys: Object.keys(parserExports),
+    // 1) Create initial parse state using your default settings and the expression
+    //    This sets up tokens, internal states, etc.
+    const parseState = ParserUtils.createState(DefaultSettings, expression);
+
+    // 2) Create a parse context, passing in the same parseState
+    const parseContext = new ParseContext(parseState);
+
+    // 3) Actually parse the document
+    //    If it fails, we get a ParseError
+    //    If it succeeds, we get a "checkpoint" with updated parseState
+    const parseResult = NaiveParseSteps.readDocument(parseState, parseContext);
+
+    // Check if parseResult is an error or a checkpoint
+    if (parseResult instanceof ParseError.ParseError) {
+      return res.status(400).json({
+        success: false,
+        kind: "ParseError",
+        error: parseResult.message,
       });
     }
 
-    // If parse is found, call it
-    const parseResult = parserExports.parse(DefaultSettings, expression);
-    return res.json({ success: true, parseResult });
-  } catch (err) {
-    console.error("Parsing error:", err);
+    // Otherwise, parseResult is a "checkpoint" describing a successful parse
+    // The "AST" is inside parseState.contextState.nodeIdMapCollection
+    const ast = parseState.contextState.nodeIdMapCollection;
+
+    return res.json({
+      success: true,
+      parseKind: "NaiveParseSteps",
+      ast, // the AST is the NodeIdMapCollection
+    });
+  } catch (error) {
+    console.error("Parsing error:", error);
     return res.status(500).json({
       success: false,
-      error: err.message,
-      stack: err.stack,
+      error: error.message,
+      stack: error.stack,
     });
   }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Diagnostic parser server listening on port ${PORT}`);
+  console.log(`NaiveParseSteps parser service listening on port ${PORT}`);
 });
