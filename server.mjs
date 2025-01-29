@@ -10,11 +10,8 @@ app.post("/parse", (req, res) => {
     return res.status(400).json({ error: "No expression provided." });
   }
 
-  // Now Language.Parse.parse is actually defined in the ESM build
+  // Since you're in ESM mode, Language.Parse.parse should be defined
   const parseResult = Language.Parse.parse(DefaultSettings, expression);
-  if (parseResult.kind === "ParseError") {
-    return res.status(400).json({ success: false, parseResult });
-  }
   return res.json({ success: true, parseResult });
 });
 
