@@ -1,7 +1,9 @@
-// index.mjs (or index.js if "type": "module" is set in package.json)
+// index.mjs (or index.js if type=module in package.json)
+import pqp from '@microsoft/powerquery-parser';
 
-// Import the named exports via ESM syntax
-import { parse, DefaultSettings } from '@microsoft/powerquery-parser';
+// pqp is the entire CommonJS export
+// parse + DefaultSettings typically live under pqp.Parser
+const { parse, DefaultSettings } = pqp.Parser;
 
 /**
  * Parses a Power Query expression and returns the AST (Abstract Syntax Tree).
@@ -10,7 +12,7 @@ import { parse, DefaultSettings } from '@microsoft/powerquery-parser';
  */
 function parsePowerQuery(expression) {
     try {
-        // Use the parse function with DefaultSettings as the first argument
+        // First arg = settings, second arg = M expression
         const ast = parse(DefaultSettings, expression);
         return ast;
     } catch (error) {
@@ -25,7 +27,6 @@ const expression = `let
 in
     Filtered`;
 
-// Parse the expression and log the AST
 try {
     const ast = parsePowerQuery(expression);
     console.log("Parsed AST:");
