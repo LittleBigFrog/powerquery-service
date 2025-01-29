@@ -1,12 +1,14 @@
 const express = require("express");
-// Notice we import Language instead of Parser:
-const { Language, DefaultSettings } = require("@microsoft/powerquery-parser");
+// Import parse from the parser sub-path:
+const { parse } = require("@microsoft/powerquery-parser/lib/language/parse/parser");
+// Import DefaultSettings from the settings sub-path:
+const { DefaultSettings } = require("@microsoft/powerquery-parser/lib/settings");
 
 const app = express();
 app.use(express.json());
 
 app.get("/", (req, res) => {
-  res.send("Hello, Power Query Parser!");
+  res.send("Hello from Power Query Parser (v0.15.10)!");
 });
 
 app.post("/parse", (req, res) => {
@@ -16,8 +18,8 @@ app.post("/parse", (req, res) => {
   }
 
   try {
-    // Use Language.Parse.parse for version 0.15.x
-    const parseResult = Language.Parse.parse(DefaultSettings, expression);
+    // Now the 'parse' function definitely exists
+    const parseResult = parse(DefaultSettings, expression);
     return res.json({ parseResult });
   } catch (error) {
     return res.status(500).json({ error: error.message });
