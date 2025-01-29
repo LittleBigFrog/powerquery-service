@@ -1,6 +1,6 @@
 // Correct import paths for @microsoft/powerquery-parser v0.15.10
-const { parse } = require('@microsoft/powerquery-parser/lib/powerquery-parser/parser');
-const { DefaultSettings } = require('@microsoft/powerquery-parser/lib/powerquery-parser/common/settings');
+const { parse } = require('@microsoft/powerquery-parser');
+const { DefaultSettings } = require('@microsoft/powerquery-parser');
 
 /**
  * Parses a Power Query expression and returns the AST (Abstract Syntax Tree).
