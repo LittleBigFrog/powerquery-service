@@ -1,5 +1,5 @@
 const express = require("express");
-const { Parser, DefaultSettings } = require("@microsoft/powerquery-parser");
+const { DefaultSettings, Task, Language } = require("@microsoft/powerquery-parser");
 const app = express();
 
 app.use(express.json());
@@ -12,27 +12,48 @@ app.post("/parse", (req, res) => {
   }
 
   try {
-    // Use the Parser.parse function directly
-    const parsedResult = Parser.parse(DefaultSettings, expression);
+    // Create lexer state with default settings
+    const lexerState = Language.Lexer.State.create(DefaultSettings);
     
-    // The parser returns a ParseError or ParseOk type
-    if (parsedResult.error) {
+    // Tokenize the expression
+    const lexerResult = Language.Lexer.tokenize(lexerState, expression);
+    
+    if (lexerResult.kind !== "ok") {
       return res.status(400).json({ 
         success: false,
-        error: "Failed to parse expression",
-        details: parsedResult.error
-      });
-    } else {
-      return res.json({ 
-        success: true,
-        result: parsedResult
+        error: "Lexer error",
+        details: lexerResult.error
       });
     }
+    
+    // Create parser state
+    const parserState = Language.Parser.State.create(DefaultSettings);
+    
+    // Parse the tokens
+    const parseResult = Language.Parser.Expression.readDocument(
+      parserState,
+      lexerResult.value.tokens
+    );
+    
+    if (parseResult.kind !== "ok") {
+      return res.status(400).json({ 
+        success: false,
+        error: "Parser error",
+        details: parseResult.error
+      });
+    }
+
+    return res.json({ 
+      success: true,
+      result: parseResult.value
+    });
+    
   } catch (error) {
     return res.status(500).json({ 
       success: false,
       error: "Internal server error",
-      message: error.message 
+      message: error.message,
+      stack: error.stack
     });
   }
 });
