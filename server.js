@@ -1,5 +1,5 @@
 const express = require("express");
-const { Parser, DefaultSettings } = require("@microsoft/powerquery-parser");
+const { parse, DefaultSettings } = require("@microsoft/powerquery-parser");
 
 const app = express();
 app.use(express.json());
@@ -11,11 +11,11 @@ app.post("/parse", (req, res) => {
   }
 
   try {
-    // NOTE the lowercase 'parse' instead of 'Parse'
-    const parseResult = Parser.parse(DefaultSettings, expression);
-    res.json({ parseResult });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    // Call the top-level parse function (lowercase)
+    const parseResult = parse(DefaultSettings, expression);
+    return res.json({ parseResult });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
   }
 });
 
