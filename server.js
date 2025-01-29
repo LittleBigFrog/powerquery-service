@@ -7,15 +7,15 @@ app.use(express.json());
 app.post("/parse", (req, res) => {
   const { expression } = req.body;
   if (!expression) {
-    return res.status(400).json({ error: "No expression provided" });
+    return res.status(400).json({ error: "No expression provided." });
   }
 
   try {
-    // Updated call: Parser.Parse(DefaultSettings, expression)
-    const parseResult = Parser.Parse(DefaultSettings, expression);
-    return res.json({ parseResult });
+    // NOTE the lowercase 'parse' instead of 'Parse'
+    const parseResult = Parser.parse(DefaultSettings, expression);
+    res.json({ parseResult });
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
