@@ -1,5 +1,9 @@
 const express = require("express");
-const { Text } = require("@microsoft/powerquery-parser");
+const powerquery = require("@microsoft/powerquery-parser");
+
+// Add diagnostic logging
+console.log('Available modules:', Object.keys(powerquery));
+
 const app = express();
 
 app.use(express.json());
