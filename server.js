@@ -1,8 +1,13 @@
 const express = require("express");
-const { parse, DefaultSettings } = require("@microsoft/powerquery-parser");
+// Notice we import Language instead of Parser:
+const { Language, DefaultSettings } = require("@microsoft/powerquery-parser");
 
 const app = express();
 app.use(express.json());
+
+app.get("/", (req, res) => {
+  res.send("Hello, Power Query Parser!");
+});
 
 app.post("/parse", (req, res) => {
   const { expression } = req.body;
@@ -11,8 +16,8 @@ app.post("/parse", (req, res) => {
   }
 
   try {
-    // Call the top-level parse function (lowercase)
-    const parseResult = parse(DefaultSettings, expression);
+    // Use Language.Parse.parse for version 0.15.x
+    const parseResult = Language.Parse.parse(DefaultSettings, expression);
     return res.json({ parseResult });
   } catch (error) {
     return res.status(500).json({ error: error.message });
@@ -21,5 +26,5 @@ app.post("/parse", (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+  console.log(`PowerQuery service running on port ${PORT}`);
 });
