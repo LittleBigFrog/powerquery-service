@@ -2,10 +2,8 @@
   "name": "powerquery-service",
   "version": "1.0.0",
   "description": "A simple Express-based Power Query Parser service",
-  // The key line: Tells Node to interpret JS as ES Modules
   "type": "module",
   "scripts": {
-    // If your main file is server.mjs, just reference that here
     "start": "node server.mjs"
   },
   "dependencies": {
