@@ -1,21 +1,34 @@
-import express from "express";
-import { Language, DefaultSettings } from "@microsoft/powerquery-parser";
+// Import the necessary functions from @microsoft/powerquery-parser
+const { parse } = require('@microsoft/powerquery-parser/dist/powerquery-parser/parser');
+const { DefaultSettings } = require('@microsoft/powerquery-parser/dist/powerquery-parser/common/settings');
 
-const app = express();
-app.use(express.json());
+/**
+ * Parses a Power Query expression and returns the AST (Abstract Syntax Tree).
+ * @param {string} expression - The Power Query code to parse.
+ * @returns {object} - The parsed AST.
+ */
+function parsePowerQuery(expression) {
+    try {
+        // Use the parse function with DefaultSettings
+        const ast = parse(DefaultSettings, expression);
+        return ast;
+    } catch (error) {
+        throw new Error(`Failed to parse Power Query: ${error.message}`);
+    }
+}
 
-app.post("/parse", (req, res) => {
-  const { expression } = req.body;
-  if (!expression) {
-    return res.status(400).json({ error: "No expression provided." });
-  }
+// Example Power Query expression
+const expression = `let
+    Source = Table.FromRecords({[Name = "Alice", Age = 30]}),
+    Filtered = Table.SelectRows(Source, each [Age] > 25)
+in
+    Filtered`;
 
-  // Since you're in ESM mode, Language.Parse.parse should be defined
-  const parseResult = Language.Parse.parse(DefaultSettings, expression);
-  return res.json({ success: true, parseResult });
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Listening on port ${PORT}`);
-});
+// Parse the expression and log the AST
+try {
+    const ast = parsePowerQuery(expression);
+    console.log("Parsed AST:");
+    console.log(JSON.stringify(ast, null, 2));
+} catch (error) {
+    console.error(error.message);
+}
