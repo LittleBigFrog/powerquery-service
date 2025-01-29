@@ -8,6 +8,6 @@
   },
   "dependencies": {
     "express": "^4.18.2",
-    "@microsoft/powerquery-parser": "^0.16.13"
+    "@microsoft/powerquery-parser": "^0.15.10"
   }
 }
