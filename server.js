@@ -1,5 +1,5 @@
 const express = require("express");
-const { Language, DefaultSettings } = require("@microsoft/powerquery-parser");
+const { Parser, DefaultSettings } = require("@microsoft/powerquery-parser");
 const app = express();
 
 app.use(express.json());
@@ -12,22 +12,20 @@ app.post("/parse", (req, res) => {
   }
 
   try {
-    // Create a new parser context with the default settings
-    const parseState = Language.CombinatorialParser.State.create(DefaultSettings);
+    // Use the Parser.parse function directly
+    const parsedResult = Parser.parse(DefaultSettings, expression);
     
-    // Parse the expression using the correct parser function
-    const parsedResult = Language.Parser.Expression.tryParse(parseState, expression);
-    
-    if (parsedResult.kind === "ok") {
-      return res.json({ 
-        success: true,
-        result: parsedResult.value 
-      });
-    } else {
+    // The parser returns a ParseError or ParseOk type
+    if (parsedResult.error) {
       return res.status(400).json({ 
         success: false,
         error: "Failed to parse expression",
         details: parsedResult.error
+      });
+    } else {
+      return res.json({ 
+        success: true,
+        result: parsedResult
       });
     }
   } catch (error) {
