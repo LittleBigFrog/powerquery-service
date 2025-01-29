@@ -1,10 +1,8 @@
 const express = require("express");
 
-// 1) Directly import `parse` from the parser sub-path:
-const { parse } = require("@microsoft/powerquery-parser/lib/powerquery-parser/language/parser/parser");
+const { parse } = require("@microsoft/powerquery-parser/dist/powerquery-parser/language/parser/parser");
+const { DefaultSettings } = require("@microsoft/powerquery-parser/dist/powerquery-parser/settings");
 
-// 2) Import `DefaultSettings` from the settings sub-path:
-const { DefaultSettings } = require("@microsoft/powerquery-parser/lib/powerquery-parser/settings");
 
 const app = express();
 app.use(express.json());
