@@ -1,55 +1,44 @@
+/*****************************************************************************
+ * server.js - Diagnostic sub-path approach
+ *****************************************************************************/
 const express = require("express");
 
-// 1) Sub-path imports
-//    Because your logs show no 'Language.Parse',
-//    we directly import `parse` from the compiled output folder (dist).
-const {
-  parse,
-} = require("@microsoft/powerquery-parser/dist/powerquery-parser/language/parser/parser");
-const {
-  DefaultSettings,
-} = require("@microsoft/powerquery-parser/dist/powerquery-parser/settings");
+// Try importing from the 'lib/powerquery-parser/parser' path:
+const parserExports = require("@microsoft/powerquery-parser/lib/powerquery-parser/parser");
 
-// 2) Set up Express
+// Also import DefaultSettings from 'lib/powerquery-parser/settings'
+const { DefaultSettings } = require("@microsoft/powerquery-parser/lib/powerquery-parser/settings");
+
 const app = express();
 app.use(express.json());
 
-// Optional: Quick GET route to verify the server is running
+// 1) Log what we actually have in "parserExports"
+console.log("=== pqp parserExports keys ===", Object.keys(parserExports));
+
 app.get("/", (req, res) => {
-  res.send("PowerQuery Parser Service (using sub-path import) is running!");
+  res.send("Hello from the diagnostic Power Query parser server!");
 });
 
-// POST /parse
+// 2) POST /parse route
 app.post("/parse", (req, res) => {
   const { expression } = req.body;
-
   if (!expression) {
-    return res.status(400).json({
-      success: false,
-      error: "No expression provided.",
-    });
+    return res.status(400).json({ error: "No expression provided" });
   }
-
   try {
-    // 3) Call the sub-path parse function
-    //    parse(DefaultSettings, <string>)
-    const parseResult = parse(DefaultSettings, expression);
-
-    // parseResult can be a "ParseOk" or "ParseError" object
-    if (parseResult.kind === "ParseError") {
-      return res.status(400).json({
-        success: false,
-        error: "ParseError",
-        details: parseResult.error ? parseResult.error.message : null,
+    // Check if there's a 'parse' function
+    if (!parserExports.parse) {
+      // Possibly it's exported under some other name
+      // We'll show the actual keys so you can see what is there
+      return res.status(501).json({
+        error: "No 'parse' function found in parser sub-path.",
+        keys: Object.keys(parserExports),
       });
     }
 
-    // On ParseOk, the AST is in parseResult.state.contextState.nodeIdMapCollection
-    return res.json({
-      success: true,
-      parseKind: parseResult.kind,
-      ast: parseResult.state.contextState.nodeIdMapCollection,
-    });
+    // If parse is found, call it
+    const parseResult = parserExports.parse(DefaultSettings, expression);
+    return res.json({ success: true, parseResult });
   } catch (err) {
     console.error("Parsing error:", err);
     return res.status(500).json({
@@ -60,8 +49,7 @@ app.post("/parse", (req, res) => {
   }
 });
 
-// 4) Listen on port
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`PowerQuery sub-path parser service listening on port ${PORT}`);
+  console.log(`Diagnostic parser server listening on port ${PORT}`);
 });
