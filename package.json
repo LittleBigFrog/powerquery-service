@@ -1,13 +1,13 @@
 {
-  "name": "powerquery-service",
+  "name": "powerquery-parser-tool",
   "version": "1.0.0",
-  "description": "A simple Express-based Power Query Parser service",
-  "type": "module",
+  "description": "A tool to parse Power Query (M) code using @microsoft/powerquery-parser",
+  "main": "index.js",
   "scripts": {
-    "start": "node server.mjs"
+    "start": "node index.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
     "@microsoft/powerquery-parser": "^0.15.10"
-  }
+  },
+  "license": "MIT"
 }
