@@ -168,7 +168,9 @@ function collectReferences(
       if (identifier) {
         // Check all scopes from innermost to outermost
         const isLocal = scopes.some(scope => scope.has(identifier));
-        if (!isLocal) {
+        if (isLocal) {
+          references.add(identifier);  // ✅ FIX: Track step references
+        } else {
           externalQueries.add(identifier);
         }
       }
@@ -188,6 +190,7 @@ function collectReferences(
 
   return { references, externalQueries };
 }
+
 
 // ======================
 // Validation Utilities
