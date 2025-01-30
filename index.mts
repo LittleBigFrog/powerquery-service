@@ -42,7 +42,9 @@ const JSON_INDENTATION = 4;
 // ======================
 // Core Functions
 // ======================
-function splitQueries(combinedQuery: string): Array<{ name: string; code: string }> {
+function splitQueries(
+  combinedQuery: string
+): Array<{ name: string; code: string }> {
   const queries: Array<{ name: string; code: string }> = [];
   const lines = combinedQuery.split('\n');
   let currentName: string | null = null;
@@ -50,10 +52,16 @@ function splitQueries(combinedQuery: string): Array<{ name: string; code: string
 
   for (const line of lines) {
     const trimmed = line.trim();
-    
-    if (trimmed.startsWith(QUERY_HEADER_PREFIX) && trimmed.length > QUERY_HEADER_PREFIX.length) {
+
+    if (
+      trimmed.startsWith(QUERY_HEADER_PREFIX) &&
+      trimmed.length > QUERY_HEADER_PREFIX.length
+    ) {
       if (currentName && currentCode.length > 0) {
-        queries.push({ name: currentName, code: currentCode.join('\n').trim() });
+        queries.push({
+          name: currentName,
+          code: currentCode.join('\n').trim(),
+        });
       }
       currentName = trimmed.slice(QUERY_HEADER_PREFIX.length).trim();
       currentCode = [];
@@ -66,10 +74,15 @@ function splitQueries(combinedQuery: string): Array<{ name: string; code: string
     queries.push({ name: currentName, code: currentCode.join('\n').trim() });
   }
 
-  return queries.length > 0 ? queries : [{ name: DEFAULT_QUERY_NAME, code: combinedQuery.trim() }];
+  return queries.length > 0
+    ? queries
+    : [{ name: DEFAULT_QUERY_NAME, code: combinedQuery.trim() }];
 }
 
-function extractSteps(ast: unknown, originalQuery: string): Record<string, StepInfo> {
+function extractSteps(
+  ast: unknown,
+  originalQuery: string
+): Record<string, StepInfo> {
   if (!isValidLetExpression(ast)) {
     console.error('❌ Invalid LetExpression structure');
     return {};
@@ -88,7 +101,7 @@ function extractSteps(ast: unknown, originalQuery: string): Record<string, StepI
       references: [],
       external_queries: [],
       code: extractStepCode(node.value, originalQuery),
-      used_for_output: false
+      used_for_output: false,
     };
   });
 
@@ -96,11 +109,14 @@ function extractSteps(ast: unknown, originalQuery: string): Record<string, StepI
   const baseScope = new Set(stepNames);
   ast.variableList.elements.forEach(({ node }) => {
     const stepName = node.key.literal;
-    const { references, externalQueries } = collectReferences(node.value, [baseScope]);
-    
-    dependencies[stepName] = references;
-    steps[stepName].references = Array.from(references);
-    steps[stepName].external_queries = Array.from(externalQueries);
+    const { references, externalQueries } = collectReferences(
+      node.value,
+      baseScope
+    );
+
+    dependencies[stepName] = new Set(references); // ✅ Ensure it's a Set
+    steps[stepName].references = Array.from(references); // ✅ Convert Set to Array
+    steps[stepName].external_queries = Array.from(externalQueries); // ✅ Convert Set to Array
   });
 
   // Track used steps for output
@@ -108,7 +124,7 @@ function extractSteps(ast: unknown, originalQuery: string): Record<string, StepI
   trackUsage(finalOutputStep);
 
   // Mark output steps
-  stepNames.forEach(stepName => {
+  stepNames.forEach((stepName) => {
     steps[stepName].used_for_output = usedSteps.has(stepName);
   });
 
@@ -126,35 +142,38 @@ function extractSteps(ast: unknown, originalQuery: string): Record<string, StepI
 // ======================
 function extractStepCode(valueNode: any, originalQuery: string): string {
   if (!valueNode?.tokenRange) return '';
-  
+
   const start = valueNode.tokenRange.positionStart.codeUnit - 1;
   const end = valueNode.tokenRange.positionEnd.codeUnit;
   return originalQuery.slice(start, end).trim();
 }
-
 function collectReferences(
   node: any,
-  parentScopes: Set<string>[] = [new Set()]
-): { references: Set<string>; externalQueries: Set<string> } {
+  queryScope: Set<string>
+): { references: string[]; externalQueries: string[] } {
+  // 🔥 Force JSON-safe types
   const references = new Set<string>();
   const externalQueries = new Set<string>();
-  const stack: Array<{ node: any; scopes: Set<string>[] }> = [{ node, scopes: parentScopes }];
+  const stack: Array<{ node: any; scopes: Set<string>[] }> = [
+    { node, scopes: [queryScope] },
+  ];
 
   while (stack.length > 0) {
     const { node: current, scopes } = stack.pop()!;
     if (!current) continue;
 
-    // Handle nested let expressions
+    // Handle nested let expressions (create a new scope)
     if (current.kind === 'LetExpression') {
-      const newScopes = [new Set<string>(), ...scopes];
-      
+      const newScope = new Set<string>(); // 🔥 This scope is only for this block
+      const newScopes = [newScope, ...scopes];
+
       // Add variables from this let expression to the new scope
       current.variableList?.elements?.forEach((elem: any) => {
         const name = elem?.node?.key?.literal;
-        if (name) newScopes[0].add(name);
+        if (name) newScope.add(name); // 🔥 Scoped to this block
       });
 
-      // Process children with new scope
+      // Process children with the new inner scope
       current.variableList?.elements?.forEach((elem: any) => {
         stack.push({ node: elem.node.value, scopes: newScopes });
       });
@@ -166,21 +185,20 @@ function collectReferences(
     if (current.kind === 'IdentifierExpression') {
       const identifier = current.identifier?.literal;
       if (identifier) {
-        // Check all scopes from innermost to outermost
-        const isLocal = scopes.some(scope => scope.has(identifier));
-        if (isLocal) {
-          references.add(identifier);  // ✅ FIX: Track step references
+        // ✅ Check if the identifier exists in the full query scope
+        if (queryScope.has(identifier)) {
+          references.add(identifier); // ✅ It's a reference within the same query
         } else {
-          externalQueries.add(identifier);
+          externalQueries.add(identifier); // ✅ It's an external query
         }
       }
     }
 
     // Process child nodes
-    Object.values(current).forEach(child => {
+    Object.values(current).forEach((child) => {
       if (child && typeof child === 'object') {
         if (Array.isArray(child)) {
-          child.forEach(item => stack.push({ node: item, scopes }));
+          child.forEach((item) => stack.push({ node: item, scopes }));
         } else {
           stack.push({ node: child, scopes });
         }
@@ -188,9 +206,11 @@ function collectReferences(
     });
   }
 
-  return { references, externalQueries };
+  return {
+    references: Array.from(references), // 🔥 Convert Set to Array
+    externalQueries: Array.from(externalQueries), // 🔥 Convert Set to Array
+  };
 }
-
 
 // ======================
 // Validation Utilities
@@ -220,7 +240,7 @@ async function processQueries(fullQuery: string) {
     for (const { name, code } of queries) {
       try {
         const task = await TaskUtils.tryLexParse(DefaultSettings, code);
-        
+
         if (!TaskUtils.isParseStageOk(task)) {
           console.error(`❌ Parsing failed for ${name}`);
           continue;
@@ -237,7 +257,10 @@ async function processQueries(fullQuery: string) {
       }
     }
 
-    fs.writeFileSync('queries.json', JSON.stringify(queryResults, null, JSON_INDENTATION));
+    fs.writeFileSync(
+      'queries.json',
+      JSON.stringify(queryResults, null, JSON_INDENTATION)
+    );
     console.log('✅ Processed queries saved to queries.json');
   } catch (error) {
     console.error('🔥 Critical failure:', error);
@@ -266,7 +289,7 @@ in
     Custom4
 `;
 
-processQueries(MULTI_QUERY_CODE).catch(error => {
+processQueries(MULTI_QUERY_CODE).catch((error) => {
   console.error('Unhandled rejection:', error);
   process.exit(1);
 });
