@@ -1,7 +1,28 @@
 import { DefaultSettings, TaskUtils } from '@microsoft/powerquery-parser';
 import * as fs from 'fs';
 
-// Type definition for step information
+// ======================
+// Type Definitions
+// ======================
+interface PqLetExpression {
+  kind: 'LetExpression';
+  variableList: {
+    kind: 'ArrayWrapper';
+    elements: Array<{
+      kind: 'Csv';
+      node: {
+        kind: 'IdentifierPairedExpression';
+        key: { literal: string };
+        value: any;
+      };
+    }>;
+  };
+  expression: {
+    kind: 'IdentifierExpression';
+    identifier: { literal: string };
+  };
+}
+
 type StepInfo = {
   references: string[];
   external_queries: string[];
@@ -9,197 +30,222 @@ type StepInfo = {
   used_for_output: boolean;
 };
 
-// Type definition for query information
-type QueryInfo = {
-  name: string;
-  steps: Record<string, StepInfo>;
-  external_queries: string[];
-  output_step: string;
-};
+type QueryResult = Record<string, Record<string, StepInfo>>;
 
-// **Handles both named and unnamed queries**
-function splitQueries(combinedQuery: string): { name: string; code: string }[] {
-  const queries: { name: string; code: string }[] = [];
-  const queryBlocks = combinedQuery.split(/\n/);
+// ======================
+// Constants
+// ======================
+const DEFAULT_QUERY_NAME = 'Query1';
+const QUERY_HEADER_PREFIX = '//';
+const JSON_INDENTATION = 4;
 
-  let currentQueryName: string | null = null;
-  let currentQueryLines: string[] = [];
+// ======================
+// Core Functions
+// ======================
+function splitQueries(combinedQuery: string): Array<{ name: string; code: string }> {
+  const queries: Array<{ name: string; code: string }> = [];
+  const lines = combinedQuery.split('\n');
+  let currentName: string | null = null;
+  let currentCode: string[] = [];
 
-  for (const line of queryBlocks) {
-    const strippedLine = line.trim();
-
-    // **Detect a named query (e.g., "// Query1")**
-    if (strippedLine.startsWith('//') && strippedLine.length > 3) {
-      if (currentQueryName && currentQueryLines.length > 0) {
-        queries.push({
-          name: currentQueryName,
-          code: currentQueryLines.join('\n').trim(),
-        });
+  for (const line of lines) {
+    const trimmed = line.trim();
+    
+    if (trimmed.startsWith(QUERY_HEADER_PREFIX) && trimmed.length > QUERY_HEADER_PREFIX.length) {
+      if (currentName && currentCode.length > 0) {
+        queries.push({ name: currentName, code: currentCode.join('\n').trim() });
       }
-      currentQueryName = strippedLine.replace('//', '').trim();
-      currentQueryLines = [];
+      currentName = trimmed.slice(QUERY_HEADER_PREFIX.length).trim();
+      currentCode = [];
     } else {
-      currentQueryLines.push(line);
+      currentCode.push(line);
     }
   }
 
-  // **Ensure the last detected query is stored**
-  if (currentQueryName && currentQueryLines.length > 0) {
-    queries.push({
-      name: currentQueryName,
-      code: currentQueryLines.join('\n').trim(),
-    });
+  if (currentName && currentCode.length > 0) {
+    queries.push({ name: currentName, code: currentCode.join('\n').trim() });
   }
 
-  // **Assign "Query1" if no named queries exist**
-  if (queries.length === 0) {
-    queries.push({ name: 'Query1', code: combinedQuery.trim() });
-  }
-
-  return queries;
+  return queries.length > 0 ? queries : [{ name: DEFAULT_QUERY_NAME, code: combinedQuery.trim() }];
 }
 
-// **Extracts Power Query steps with dependency tracking**
-function extractSteps(
-  ast: any,
-  originalQuery: string
-): Record<string, StepInfo> {
-  const steps: Record<string, StepInfo> = {};
-  const externalQueries = new Set<string>();
-
-  if (
-    ast.kind !== 'LetExpression' ||
-    !ast.variableList ||
-    ast.variableList.kind !== 'ArrayWrapper' ||
-    !ast.expression ||
-    ast.expression.kind !== 'IdentifierExpression'
-  ) {
+function extractSteps(ast: unknown, originalQuery: string): Record<string, StepInfo> {
+  if (!isValidLetExpression(ast)) {
     console.error('❌ Invalid LetExpression structure');
     return {};
   }
 
+  const steps: Record<string, StepInfo> = {};
   const stepNames: string[] = [];
+  const dependencies: Record<string, Set<string>> = {};
   const finalOutputStep = ast.expression.identifier.literal;
 
-  // **First pass: Collect step names**
-  for (const step of ast.variableList.elements) {
-    if (
-      step.kind === 'Csv' &&
-      step.node?.kind === 'IdentifierPairedExpression'
-    ) {
-      const stepName = step.node.key.literal;
-      stepNames.push(stepName);
-      steps[stepName] = {
-        references: [],
-        external_queries: [],
-        code: '',
-        used_for_output: false,
-      };
-    }
-  }
+  // Collect step names and initialize step info
+  ast.variableList.elements.forEach(({ node }) => {
+    const stepName = node.key.literal;
+    stepNames.push(stepName);
+    steps[stepName] = {
+      references: [],
+      external_queries: [],
+      code: extractStepCode(node.value, originalQuery),
+      used_for_output: false
+    };
+  });
 
-  // **Second pass: Extract references, external queries, and step code**
-  const dependencies: Record<string, Set<string>> = {};
-  for (const step of ast.variableList.elements) {
-    if (
-      step.kind === 'Csv' &&
-      step.node?.kind === 'IdentifierPairedExpression'
-    ) {
-      const stepName = step.node.key.literal;
-      const stepInfo = steps[stepName];
-      const references = new Set<string>();
+  // Analyze dependencies and external queries with scope tracking
+  const baseScope = new Set(stepNames);
+  ast.variableList.elements.forEach(({ node }) => {
+    const stepName = node.key.literal;
+    const { references, externalQueries } = collectReferences(node.value, [baseScope]);
+    
+    dependencies[stepName] = references;
+    steps[stepName].references = Array.from(references);
+    steps[stepName].external_queries = Array.from(externalQueries);
+  });
 
-      // **Extract full step code using token range**
-      const valueNode = step.node.value;
-      if (
-        valueNode?.tokenRange?.positionStart?.codeUnit &&
-        valueNode?.tokenRange?.positionEnd?.codeUnit
-      ) {
-        const start = valueNode.tokenRange.positionStart.codeUnit - 1;
-        const end = valueNode.tokenRange.positionEnd.codeUnit;
-        stepInfo.code = originalQuery.slice(start, end).trim();
-      }
-
-      // **Traverse AST to find references**
-      const stack: any[] = [step.node.value];
-      while (stack.length > 0) {
-        const current = stack.pop();
-        if (!current) continue;
-
-        if (typeof current === 'object') {
-          // **Detect step references**
-          if (
-            current.kind === 'IdentifierExpression' &&
-            current.identifier?.literal
-          ) {
-            const refName = current.identifier.literal;
-            if (stepNames.includes(refName)) {
-              references.add(refName);
-            } else {
-              externalQueries.add(refName); // External query detected
-            }
-          }
-
-          // **Add children to stack**
-          Object.values(current).forEach((child) => {
-            if (child && typeof child === 'object') {
-              stack.push(child);
-            }
-          });
-        }
-      }
-
-      // **Store references and external queries**
-      dependencies[stepName] = references;
-      stepInfo.references = stepNames.filter((name) => references.has(name));
-      stepInfo.external_queries = Array.from(externalQueries);
-    }
-  }
-
-  // **Third pass: Identify used steps for the final output**
+  // Track used steps for output
   const usedSteps = new Set<string>();
+  trackUsage(finalOutputStep);
 
-  function trackUsedSteps(stepName: string) {
-    if (usedSteps.has(stepName) || !(stepName in dependencies)) {
-      return;
-    }
-    usedSteps.add(stepName);
-    dependencies[stepName].forEach((ref) => trackUsedSteps(ref));
-  }
-
-  trackUsedSteps(finalOutputStep);
-
-  // **Mark used steps**
-  for (const stepName of stepNames) {
+  // Mark output steps
+  stepNames.forEach(stepName => {
     steps[stepName].used_for_output = usedSteps.has(stepName);
-  }
+  });
 
   return steps;
+
+  function trackUsage(step: string) {
+    if (usedSteps.has(step)) return;
+    usedSteps.add(step);
+    dependencies[step]?.forEach(trackUsage);
+  }
 }
 
-// **Processes multiple queries with unnamed query handling**
-async function processQueries(fullQuery: string) {
-  const queries = splitQueries(fullQuery);
-  const queryResults: Record<string, Record<string, StepInfo>> = {};
+// ======================
+// Helper Functions
+// ======================
+function extractStepCode(valueNode: any, originalQuery: string): string {
+  if (!valueNode?.tokenRange) return '';
+  
+  const start = valueNode.tokenRange.positionStart.codeUnit - 1;
+  const end = valueNode.tokenRange.positionEnd.codeUnit;
+  return originalQuery.slice(start, end).trim();
+}
 
-  for (const { name, code } of queries) {
-    const task = await TaskUtils.tryLexParse(DefaultSettings, code);
+function collectReferences(
+  node: any,
+  parentScopes: Set<string>[] = [new Set()]
+): { references: Set<string>; externalQueries: Set<string> } {
+  const references = new Set<string>();
+  const externalQueries = new Set<string>();
+  const stack: Array<{ node: any; scopes: Set<string>[] }> = [{ node, scopes: parentScopes }];
 
-    if (TaskUtils.isParseStageOk(task)) {
-      const ast = task.ast;
-      queryResults[name] = extractSteps(ast, code);
-    } else {
-      console.error(`❌ Parsing failed for ${name}`);
+  while (stack.length > 0) {
+    const { node: current, scopes } = stack.pop()!;
+    if (!current) continue;
+
+    // Handle nested let expressions
+    if (current.kind === 'LetExpression') {
+      const newScopes = [new Set<string>(), ...scopes];
+      
+      // Add variables from this let expression to the new scope
+      current.variableList?.elements?.forEach((elem: any) => {
+        const name = elem?.node?.key?.literal;
+        if (name) newScopes[0].add(name);
+      });
+
+      // Process children with new scope
+      current.variableList?.elements?.forEach((elem: any) => {
+        stack.push({ node: elem.node.value, scopes: newScopes });
+      });
+      stack.push({ node: current.expression, scopes: newScopes });
+      continue;
     }
+
+    // Handle identifier expressions
+    if (current.kind === 'IdentifierExpression') {
+      const identifier = current.identifier?.literal;
+      if (identifier) {
+        // Check all scopes from innermost to outermost
+        const isLocal = scopes.some(scope => scope.has(identifier));
+        if (!isLocal) {
+          externalQueries.add(identifier);
+        }
+      }
+    }
+
+    // Process child nodes
+    Object.values(current).forEach(child => {
+      if (child && typeof child === 'object') {
+        if (Array.isArray(child)) {
+          child.forEach(item => stack.push({ node: item, scopes }));
+        } else {
+          stack.push({ node: child, scopes });
+        }
+      }
+    });
   }
 
-  // **Save results**
-  fs.writeFileSync('queries.json', JSON.stringify(queryResults, null, 4));
-  console.log('✅ Processed queries saved to queries.json');
+  return { references, externalQueries };
 }
 
-// **Example: Queries copied from Power BI Desktop**
-const multiQueryCode = `
+// ======================
+// Validation Utilities
+// ======================
+function isValidLetExpression(ast: unknown): ast is PqLetExpression {
+  return (
+    typeof ast === 'object' &&
+    ast !== null &&
+    (ast as PqLetExpression).kind === 'LetExpression' &&
+    (ast as PqLetExpression).variableList?.kind === 'ArrayWrapper' &&
+    (ast as PqLetExpression).expression?.kind === 'IdentifierExpression'
+  );
+}
+
+// ======================
+// Main Process
+// ======================
+async function processQueries(fullQuery: string) {
+  try {
+    if (typeof fullQuery !== 'string' || fullQuery.trim().length === 0) {
+      throw new Error('Invalid input: Expected non-empty string');
+    }
+
+    const queries = splitQueries(fullQuery);
+    const queryResults: QueryResult = {};
+
+    for (const { name, code } of queries) {
+      try {
+        const task = await TaskUtils.tryLexParse(DefaultSettings, code);
+        
+        if (!TaskUtils.isParseStageOk(task)) {
+          console.error(`❌ Parsing failed for ${name}`);
+          continue;
+        }
+
+        if (!isValidLetExpression(task.ast)) {
+          console.error(`❌ Invalid AST structure for ${name}`);
+          continue;
+        }
+
+        queryResults[name] = extractSteps(task.ast, code);
+      } catch (error) {
+        console.error(`⚠️ Error processing ${name}:`, error);
+      }
+    }
+
+    fs.writeFileSync('queries.json', JSON.stringify(queryResults, null, JSON_INDENTATION));
+    console.log('✅ Processed queries saved to queries.json');
+  } catch (error) {
+    console.error('🔥 Critical failure:', error);
+    process.exit(1);
+  }
+}
+
+// ======================
+// Execution
+// ======================
+const MULTI_QUERY_CODE = `
 // Query1
 let
     Source = 4,
@@ -217,5 +263,7 @@ in
     Custom4
 `;
 
-// **Execute query processing**
-processQueries(multiQueryCode);
+processQueries(MULTI_QUERY_CODE).catch(error => {
+  console.error('Unhandled rejection:', error);
+  process.exit(1);
+});
