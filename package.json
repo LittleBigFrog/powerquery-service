@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "start": "NODE_OPTIONS='--loader ts-node/esm' ts-node index.mts"
+    "start": "node --import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"ts-node/esm\", pathToFileURL(\"./\"));' index.mts"
   },
   "dependencies": {
     "@microsoft/powerquery-parser": "^0.15.10"
