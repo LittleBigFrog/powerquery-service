@@ -151,9 +151,10 @@ function collectReferences(
   node: any,
   queryScope: Set<string>
 ): { references: string[]; externalQueries: string[] } {
-  // 🔥 Force JSON-safe types
   const references = new Set<string>();
   const externalQueries = new Set<string>();
+  const nestedLetScope = new Set<string>(); // 🔥 Track nested `let` variables separately
+
   const stack: Array<{ node: any; scopes: Set<string>[] }> = [
     { node, scopes: [queryScope] },
   ];
@@ -162,15 +163,23 @@ function collectReferences(
     const { node: current, scopes } = stack.pop()!;
     if (!current) continue;
 
+    // 🔍 DEBUGGING: Log each identifier found
+    if (current.kind === 'IdentifierExpression') {
+      console.log('🔍 Found Identifier:', current.identifier?.literal);
+    }
+
     // Handle nested let expressions (create a new scope)
     if (current.kind === 'LetExpression') {
-      const newScope = new Set<string>(); // 🔥 This scope is only for this block
+      const newScope = new Set<string>(); // 🔥 Scope only for this Let block
       const newScopes = [newScope, ...scopes];
 
       // Add variables from this let expression to the new scope
       current.variableList?.elements?.forEach((elem: any) => {
         const name = elem?.node?.key?.literal;
-        if (name) newScope.add(name); // 🔥 Scoped to this block
+        if (name) {
+          newScope.add(name); // ✅ Nested variables stored separately
+          nestedLetScope.add(name); // ✅ Keep track of nested let variables
+        }
       });
 
       // Process children with the new inner scope
@@ -186,9 +195,9 @@ function collectReferences(
       const identifier = current.identifier?.literal;
       if (identifier) {
         // ✅ Check if the identifier exists in the full query scope
-        if (queryScope.has(identifier)) {
-          references.add(identifier); // ✅ It's a reference within the same query
-        } else {
+        if (queryScope.has(identifier) && !nestedLetScope.has(identifier)) {
+          references.add(identifier); // ✅ Real step reference in this query
+        } else if (!nestedLetScope.has(identifier)) {
           externalQueries.add(identifier); // ✅ It's an external query
         }
       }
@@ -205,6 +214,9 @@ function collectReferences(
       }
     });
   }
+
+  console.log('✅ Final References:', Array.from(references)); // 🔍 Debugging
+  console.log('✅ Final External Queries:', Array.from(externalQueries)); // 🔍 Debugging
 
   return {
     references: Array.from(references), // 🔥 Convert Set to Array
