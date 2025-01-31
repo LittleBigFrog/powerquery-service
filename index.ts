@@ -1,5 +1,6 @@
-import { DefaultSettings, TaskUtils } from '@microsoft/powerquery-parser';
-import * as fs from 'fs';
+import { DefaultSettings, TaskUtils } from "@microsoft/powerquery-parser";
+import * as fs from "fs";
+
 
 // ======================
 // Type Definitions
