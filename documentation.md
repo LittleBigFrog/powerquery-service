@@ -1651,12 +1651,33 @@ in
 ```
 ---
 
-### to do 
+11\. To Do
+----------
 
-ast api to return original query and parser adapt
-unused steps
-indirect refrerences at query level
-comment management
+-   **AST API Enhancements**
+
+    -   Modify the AST API to return the original query.
+
+    -   Adapt the parser to integrate with the updated API response.
+
+-   **Step Usage Analysis**
+
+    -   Identify and flag unused steps within a query.
+
+    -   Implement logic to suggest optimization by removing unnecessary steps.
+
+-   **Dependency Tracking Improvements**
+
+    -   Introduce support for detecting indirect references at the query level.
+
+    -   Ensure that dependencies across multiple queries are accurately resolved.
+
+-   **Comment Management**
+
+    -   Implement structured comment extraction and attribution.
+
+    -   Ensure comments are linked correctly to queries and steps without duplication.
+
 
 ---
 * * * * *
