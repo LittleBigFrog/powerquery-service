@@ -404,7 +404,28 @@ parsed_results = process_queries(multi_query_code)
 print(json.dumps(parsed_results, indent=4))
 
 ```
+9\. Debugging & Testing
+------------------------
 
+### Unit Tests
+
+-   The parser should correctly extract steps, dependencies, and external queries.
+
+-   Example: `Step2 = Step1 + ExternalData` should mark `Step1` as a reference and `ExternalData` as an external query.
+
+### Debugging Tips
+
+-   If output looks incorrect, log:
+
+    -   The **raw AST structure** (`print(json.dumps(ast, indent=4))`).
+
+    -   The **token range** used for extracting expressions.
+
+    -   The **list of parsed steps** before dependency resolution.
+
+### Handling API Errors
+
+-   If the AST API request fails (`fetch_ast_from_worker`), the error should be logged with the **Power Query input** for debugging
 ---
 
 This document serves as a reference for understanding and maintaining the Power Query parser while avoiding past mistakes.
