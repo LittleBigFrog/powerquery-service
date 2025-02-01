@@ -12,8 +12,8 @@
 6. [Example Inputs & Outputs](#example-inputs--outputs)
 7. [Managing Comments in Future](#managing-comments-in-future)
 8. [Reference Code](#reference-code)
-9. [Raw ast exemples]
-10. [To do]
+9. [Raw ast exemple](#raw-ast-exemple)
+10. [to do](#to-do)
 
 ---
 
@@ -407,7 +407,7 @@ print(json.dumps(parsed_results, indent=4))
 
 ```
 9\. Debugging & Testing
-------------------------
+
 
 ### Unit Tests
 
@@ -1651,7 +1651,7 @@ in
 ```
 ---
 
-## to do 
+### to do 
 
 ast api to return original query and parser adapt
 unused steps
