@@ -428,4 +428,52 @@ print(json.dumps(parsed_results, indent=4))
 -   If the AST API request fails (`fetch_ast_from_worker`), the error should be logged with the **Power Query input** for debugging
 ---
 
+10\. Raw ast exemple
+-------------------------------
+
+### Power query code provided
+
+```
+let
+    // Base value
+    Base = 10, // Inline comment for Base
+
+    // Complex calculation using external and internal references
+    Computed = Base * HelperFunction(5) + ExternalQuery,
+
+    // Nested let expression with local variable shadowing
+    NestedStep = let
+        LocalVar = Computed + 2
+    in
+        LocalVar * 2
+in
+    NestedStep
+```
+
+### Raw ast returned
+
+```
+{
+    "steps": {
+        "Step1": {
+            "expression": "10",
+            "comments": ["Inline comment for Step1"]
+        },
+        "Step2": {
+            "expression": "Step1 + ExternalData",
+            "comments": ["Another inline comment"],
+            "external_queries": ["ExternalData"]
+        },
+        "Step3": {
+            "expression": "Step2 * 2",
+            "comments": ["Multi-line comment example\nThis should be preserved with Step3"]
+        }
+    },
+    "output": "Step3",
+    "query_comment": ["General comment about the query"]
+}
+```
+
+* * * * *
+
 This document serves as a reference for understanding and maintaining the Power Query parser while avoiding past mistakes.
