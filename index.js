@@ -1,4 +1,3 @@
-// index.js
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -36,7 +35,11 @@ app.post('/parse', async (req, res) => {
         }
 
         const ast = await parseSingleQuery(code);
-        res.json({ ast });
+        
+        res.json({
+            code,  // Include the original Power Query code in response
+            ast
+        });
         
     } catch (error) {
         const status = error.message.includes('invalid') ? 422 : 500;
