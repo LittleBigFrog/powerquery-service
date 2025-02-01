@@ -1647,7 +1647,16 @@ in
   }
 }
 ```
+---
 
+## to do 
+
+ast api to return original query and parser adapt
+unused steps
+indirect refrerences at query level
+comment management
+
+---
 * * * * *
 
 This document serves as a reference for understanding and maintaining the Power Query parser while avoiding past mistakes.
